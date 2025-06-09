@@ -14,20 +14,27 @@ object Consumer{
 
     import spark.implicits._
 
-    val df = spark
+    val startDf = spark
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:29092")
       .option("subscribe", "trip-start")
       .load()
+      .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+      .as[(String, String)]
 
-    val parsedDf = df
+    val endDf = spark
+      .readStream
+      .format("kafka")
+      .option("kafka.bootstrap.servers", "localhost:29092")
+      .option("subscribe", "trip-end")
+      .load()
       .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
       .as[(String, String)]
 
     @volatile var messagesReceived = 0L
 
-    val query = parsedDf.writeStream
+    val query = startDf.writeStream
       .outputMode("append")
       .format("console")
       .option("truncate", "false")

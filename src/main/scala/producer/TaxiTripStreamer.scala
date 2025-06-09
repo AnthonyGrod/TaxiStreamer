@@ -31,6 +31,7 @@ object TaxiTripStreamer {
       )
       .orderBy($"pickup_time")
       .repartition(spark.sparkContext.defaultParallelism * 2)
+      .withColumn("trip_id", monotonically_increasing_id())
 
     df.printSchema()
     println(df.take(2).mkString("Array(", ", ", ")"))
@@ -47,7 +48,8 @@ object TaxiTripStreamer {
       val dropoff = row.getLong(1)
       val pu = row.getInt(2)
       val doo = row.getInt(3)
-      (pickup, dropoff, pu, doo)
+      val tripId = row.getLong(4)
+      (pickup, dropoff, pu, doo, tripId)
     }
 
     val firstRecord = recordIter.buffered.headOption
@@ -59,6 +61,10 @@ object TaxiTripStreamer {
 
     val baseRealTime = System.currentTimeMillis()
     val baseDataTime = firstRecord.get._1
+
+    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: First trip in ms: $baseDataTime")
+    logWriter.flush()
+
     val speed = 3600.0  // 2x speed
 
     // Kafka setup
@@ -70,25 +76,25 @@ object TaxiTripStreamer {
 
     var tripsSent = 0
     // TODO: find a faster way to produce trips (some Spark API for parallelism?)
-    recordIter.foreach { case (pickup, dropoff, pu, doo) =>
+    recordIter.foreach { case (pickup, dropoff, pu, doo, tripId) =>
       val now = System.currentTimeMillis()
       val simWallTime = baseDataTime + ((now - baseRealTime) * speed).toLong
 
       if (pickup <= simWallTime) {
-        val pickupMsg = s"""{"time":$pickup, "PULocationID":$pu}"""
-        val dropoffMsg = s"""{"time":$dropoff, "DOLocationID":$doo}"""
+        val pickupMsg = s"""{"trip_id":$tripId, "time":$pickup, "PULocationID":$pu}"""
+        val dropoffMsg = s"""{"trip_id":$tripId, "time":$dropoff, "DOLocationID":$doo}"""
 
         producer.send(new ProducerRecord[String, String]("trip-start", null, pickupMsg))
         producer.send(new ProducerRecord[String, String]("trip-end", null, dropoffMsg))
         tripsSent += 1
 
-        println(s"Sent pickup & dropoff for PU=$pu → DO=$doo")
+        println(s"Sent pickup & dropoff for trip $tripId: PU=$pu → DO=$doo")
       } else {
         val waitMs = ((pickup - simWallTime) / speed).toLong
         Thread.sleep(waitMs)
         // Then send
-        val pickupMsg = s"""{"time":$pickup, "PULocationID":$pu}"""
-        val dropoffMsg = s"""{"time":$dropoff, "DOLocationID":$doo}"""
+        val pickupMsg = s"""{"trip_id":$tripId, "time":$pickup, "PULocationID":$pu}"""
+        val dropoffMsg = s"""{"trip_id":$tripId, "time":$dropoff, "DOLocationID":$doo}"""
         producer.send(new ProducerRecord[String, String]("trip-start", null, pickupMsg))
         producer.send(new ProducerRecord[String, String]("trip-end", null, dropoffMsg))
         tripsSent += 1
