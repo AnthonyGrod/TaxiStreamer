@@ -25,12 +25,14 @@ version := "1.0"
 // Want to use a published library in your project?
 // You can define other libraries as dependencies in your build like this:
 
-libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.3.0"
-libraryDependencies += "org.apache.kafka" % "kafka-clients" % "3.7.0"
+val sparkVersion = "3.4.1"
+
 libraryDependencies ++= Seq(
-  "org.apache.spark" %% "spark-sql" % "3.4.1",
-  "org.apache.spark" %% "spark-sql-kafka-0-10" % "3.4.1",
-  "org.apache.spark" %% "spark-core" % "3.4.1"
+  "org.scala-lang.modules" %% "scala-parser-combinators" % "2.3.0",
+  "org.apache.spark" %% "spark-core" % sparkVersion,
+  "org.apache.spark" %% "spark-sql" % sparkVersion,
+  "org.apache.spark" %% "spark-sql-kafka-0-10" % sparkVersion,
+  "org.apache.spark" %% "spark-streaming-kafka-0-10" % sparkVersion
 )
 
 // Here, `libraryDependencies` is a set of dependencies, and by using `+=`,

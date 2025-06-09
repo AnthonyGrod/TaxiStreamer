@@ -41,18 +41,18 @@ object TaxiTripStreamer {
     // Simulate wall clock
     val baseRealTime = System.currentTimeMillis()
     val baseDataTime = records.head._1
-    val speed = 2.0  // 2x faster
+    val speed = 3600.0  // 2x faster
 
     println(s"Starting stream at 2x speed...")
 
     // Kafka setup
     val props = new Properties()
-    props.put("bootstrap.servers", "localhost:9092")
+    props.put("bootstrap.servers", "localhost:29092")
     props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     val producer = new KafkaProducer[String, String](props)
 
-    // Stream loop
+    // Stream loop. TODO: create RDD stream with DStream
     records.foreach { case (pickup, dropoff, pu, doo) =>
       val now = System.currentTimeMillis()
       val simWallTime = baseDataTime + ((now - baseRealTime) * speed).toLong
