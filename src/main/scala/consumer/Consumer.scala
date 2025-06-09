@@ -1,9 +1,8 @@
 package consumer
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.streaming.kafka010._
-import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
-import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
+import org.apache.spark.sql.{Dataset, SparkSession}
+import java.io.{FileWriter, PrintWriter}
+import java.time.LocalDateTime
 
 object Consumer{
   def main(args: Array[String]): Unit = {
@@ -22,14 +21,27 @@ object Consumer{
       .option("subscribe", "trip-start")
       .load()
 
-    df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+    val parsedDf = df
+      .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
       .as[(String, String)]
 
+    @volatile var messagesReceived = 0L
 
-    val query = df.writeStream
-      .outputMode("append") // use "update" for aggregations
+    val query = parsedDf.writeStream
+      .outputMode("append")
       .format("console")
-      .option("truncate", false) // so it doesn't cut off long strings
+      .option("truncate", "false")
+      .foreachBatch { (batchDf: Dataset[(String, String)], batchId: Long) =>
+        val batchCount = batchDf.count()
+        messagesReceived += batchCount
+        println(s"Batch $batchId: Received $batchCount messages. Total: $messagesReceived")
+        
+        val logWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/logs/trip-num-check.txt", true))
+        logWriter.println(s"[${LocalDateTime.now()}] CONSUMER: Batch $batchId - received $batchCount messages, total: $messagesReceived")
+        logWriter.close()
+        
+        batchDf.show(truncate = false)
+      }
       .start()
 
     query.awaitTermination()

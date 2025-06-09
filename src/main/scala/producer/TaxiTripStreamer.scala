@@ -1,9 +1,14 @@
 package producer
 
-import org.apache.spark.sql.{SparkSession, Row}
+import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.functions._
+
 import java.util.Properties
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import java.io.{FileWriter, PrintWriter}
+import java.time.LocalDateTime
+
+import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 object TaxiTripStreamer {
   def main(args: Array[String]): Unit = {
@@ -24,26 +29,37 @@ object TaxiTripStreamer {
         $"PULocationID",
         $"DOLocationID"
       )
+      .orderBy($"pickup_time")
+      .repartition(spark.sparkContext.defaultParallelism * 2)
 
     df.printSchema()
     println(df.take(2).mkString("Array(", ", ", ")"))
 
-    val records = df.map(row => {
+    val totalTrips = df.count()
+    println(s"Total trips in parquet file: $totalTrips")
+
+    val logWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/logs/trip-num-check.txt", true))
+    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: Total trips in parquet file: $totalTrips")
+    logWriter.flush()
+
+    val recordIter = df.toLocalIterator().asScala.map { row =>
       val pickup = row.getLong(0)
       val dropoff = row.getLong(1)
-
       val pu = row.getInt(2)
       val doo = row.getInt(3)
-
       (pickup, dropoff, pu, doo)
-    }).collect().sortBy(_._1)
+    }
 
-    // Simulate wall clock
+    val firstRecord = recordIter.buffered.headOption
+    if (firstRecord.isEmpty) {
+      println("No records to process.")
+      spark.stop()
+      return
+    }
+
     val baseRealTime = System.currentTimeMillis()
-    val baseDataTime = records.head._1
-    val speed = 3600.0  // 2x faster
-
-    println(s"Starting stream at 2x speed...")
+    val baseDataTime = firstRecord.get._1
+    val speed = 3600.0  // 2x speed
 
     // Kafka setup
     val props = new Properties()
@@ -52,8 +68,9 @@ object TaxiTripStreamer {
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     val producer = new KafkaProducer[String, String](props)
 
-    // Stream loop. TODO: create RDD stream with DStream
-    records.foreach { case (pickup, dropoff, pu, doo) =>
+    var tripsSent = 0
+    // TODO: find a faster way to produce trips (some Spark API for parallelism?)
+    recordIter.foreach { case (pickup, dropoff, pu, doo) =>
       val now = System.currentTimeMillis()
       val simWallTime = baseDataTime + ((now - baseRealTime) * speed).toLong
 
@@ -63,6 +80,7 @@ object TaxiTripStreamer {
 
         producer.send(new ProducerRecord[String, String]("trip-start", null, pickupMsg))
         producer.send(new ProducerRecord[String, String]("trip-end", null, dropoffMsg))
+        tripsSent += 1
 
         println(s"Sent pickup & dropoff for PU=$pu → DO=$doo")
       } else {
@@ -73,8 +91,13 @@ object TaxiTripStreamer {
         val dropoffMsg = s"""{"time":$dropoff, "DOLocationID":$doo}"""
         producer.send(new ProducerRecord[String, String]("trip-start", null, pickupMsg))
         producer.send(new ProducerRecord[String, String]("trip-end", null, dropoffMsg))
+        tripsSent += 1
       }
     }
+
+    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: Total trips sent: $tripsSent")
+    logWriter.close()
+    println(s"Total trips sent: $tripsSent")
 
     producer.close()
     spark.stop()
