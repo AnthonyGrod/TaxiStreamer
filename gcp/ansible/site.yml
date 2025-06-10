@@ -1,0 +1,52 @@
+---
+# Main playbook for deploying taxi stream application
+- name: Deploy Zookeeper
+  hosts: zookeeper
+  become: no
+  roles:
+    - common
+    - docker
+    - zookeeper
+    - data-transfer
+
+- name: Deploy Kafka
+  hosts: kafka
+  become: no
+  roles:
+    - common
+    - docker
+    - kafka
+
+- name: Deploy Producer
+  hosts: producer
+  become: no
+  roles:
+    - common
+    - java-sbt
+    - spark-app
+    - data-transfer
+
+- name: Deploy Consumer
+  hosts: consumer
+  become: no
+  roles:
+    - common
+    - java-sbt
+    - spark-app
+
+- name: Display deployment summary
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Show deployment information
+      debug:
+        msg:
+          - "=== Deployment Complete ==="
+          - "Zookeeper: {{ hostvars[groups['zookeeper'][0]]['ansible_host'] }}:{{ zookeeper_port }}"
+          - "Kafka: {{ hostvars[groups['kafka'][0]]['ansible_host'] }}:{{ kafka_external_port }}"
+          - "Producer VM: {{ hostvars[groups['producer'][0]]['ansible_host'] }}"
+          - "Consumer VM: {{ hostvars[groups['consumer'][0]]['ansible_host'] }}"
+          - ""
+          - "To start applications:"
+          - "Producer: ansible kafka -m shell -a 'cd {{ project_dir }} && sbt \"runMain producer.TaxiTripStreamer\"'"
+          - "Consumer: ansible consumer -m shell -a 'cd {{ project_dir }} && sbt \"runMain consumer.Consumer\"'"

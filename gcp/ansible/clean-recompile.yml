@@ -1,0 +1,48 @@
+---
+# Clean and recompile project with Java 17
+- name: Clean and recompile Scala project
+  hosts: producer:consumer
+  tasks:
+    - name: Clean SBT project
+      shell: sbt clean
+      args:
+        chdir: "{{ project_dir }}"
+      register: sbt_clean
+      ignore_errors: yes
+
+    - name: Remove target directories
+      file:
+        path: "{{ project_dir }}/target"
+        state: absent
+
+    - name: Remove project target
+      file:
+        path: "{{ project_dir }}/project/target"
+        state: absent
+
+    - name: Verify Java version being used
+      shell: java -version 2>&1 | head -1
+      register: java_check
+
+    - name: Display Java version
+      debug:
+        msg: "Using Java: {{ java_check.stdout }}"
+
+    - name: Recompile with Java 17
+      shell: |
+        export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+        sbt compile
+      args:
+        chdir: "{{ project_dir }}"
+      register: sbt_compile
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+    - name: Display compilation result
+      debug:
+        msg: 
+          - "SBT compile return code: {{ sbt_compile.rc }}"
+          - "SBT compile stdout:"
+          - "{{ sbt_compile.stdout_lines }}"
+          - "SBT compile stderr:"
+          - "{{ sbt_compile.stderr_lines }}"

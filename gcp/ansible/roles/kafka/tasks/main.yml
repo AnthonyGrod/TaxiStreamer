@@ -1,0 +1,74 @@
+---
+- name: Copy Kafka Docker Compose file
+  template:
+    src: kafka-compose.yml.j2
+    dest: "{{ project_dir }}/docker/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Wait for Zookeeper to be available
+  wait_for:
+    port: "{{ zookeeper_port }}"
+    host: "{{ hostvars[groups['zookeeper'][0]]['internal_ip'] }}"
+    delay: 5
+    timeout: 60
+
+- name: Check if Docker Compose V2 is available
+  shell: docker compose version
+  register: docker_compose_v2
+  ignore_errors: yes
+
+- name: Start Kafka container (Docker Compose V2)
+  shell: docker compose up -d
+  args:
+    chdir: "{{ project_dir }}/docker"
+  when: docker_compose_v2.rc == 0
+
+- name: Start Kafka container (Docker Compose V1)
+  shell: docker-compose up -d
+  args:
+    chdir: "{{ project_dir }}/docker"
+  when: docker_compose_v2.rc != 0
+
+- name: Wait for Kafka to be ready
+  wait_for:
+    port: "{{ kafka_port }}"
+    host: "{{ ansible_default_ipv4.address }}"
+    delay: 20
+    timeout: 120
+
+- name: Create trip-start topic
+  command: >
+    docker exec kafka kafka-topics --create 
+    --topic trip-start 
+    --bootstrap-server localhost:{{ kafka_port }}
+    --partitions 3 
+    --replication-factor 1
+  register: create_topic_start
+  failed_when: 
+    - create_topic_start.rc != 0
+    - "'already exists' not in create_topic_start.stderr"
+  changed_when: "'Created topic' in create_topic_start.stdout"
+
+- name: Create trip-end topic
+  command: >
+    docker exec kafka kafka-topics --create 
+    --topic trip-end 
+    --bootstrap-server localhost:{{ kafka_port }}
+    --partitions 3 
+    --replication-factor 1
+  register: create_topic_end
+  failed_when: 
+    - create_topic_end.rc != 0
+    - "'already exists' not in create_topic_end.stderr"
+  changed_when: "'Created topic' in create_topic_end.stdout"
+
+- name: List Kafka topics
+  command: docker exec kafka kafka-topics --list --bootstrap-server localhost:{{ kafka_port }}
+  register: kafka_topics
+  changed_when: false
+
+- name: Display Kafka topics
+  debug:
+    var: kafka_topics.stdout_lines

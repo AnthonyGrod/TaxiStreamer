@@ -1,0 +1,16 @@
+# Global variables for all hosts
+project_dir: "/home/{{ ansible_user }}/taxi-stream"
+logs_dir: "{{ project_dir }}/logs"
+data_dir: "{{ project_dir }}/data"
+
+# Kafka configuration
+zookeeper_port: 2181
+kafka_port: 9092
+kafka_external_port: 29092
+
+# Java and SBT versions - Spark 4.0.0 requires Java 17+
+java_version: "openjdk-17-jdk"
+sbt_version: "1.8.2"
+
+# Docker Compose version
+docker_compose_version: "1.29.2"
