@@ -27,12 +27,13 @@ object TaxiTripStreamer {
         $"PULocationID",
         $"DOLocationID"
       )
-      .orderBy($"pickup_time")
       .repartition(spark.sparkContext.defaultParallelism * 2)
       .withColumn("trip_id", monotonically_increasing_id())
+      .orderBy($"pickup_time")
 
     df.printSchema()
-    println(df.take(2).mkString("Array(", ", ", ")"))
+    println(df.show(100))
+
 
     val totalTrips = df.count()
     println(s"Total trips in parquet file: $totalTrips")

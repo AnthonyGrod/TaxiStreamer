@@ -48,7 +48,7 @@ object Consumer{
         col("data.PULocationID").as("start_location_id"),
         from_unixtime(col("data.time")).cast("timestamp").as("start_time")
       )
-      .withWatermark("start_time", "2 seconds")
+      .withWatermark("start_time", "5 seconds")
 
     // Read trip-end stream
     val endDf = spark
@@ -128,7 +128,7 @@ object Consumer{
           val logMessage = s"[${LocalDateTime.now()}] HOURLY_COUNT: Hour ${hourStart} to ${hourEnd} - ${tripCount} trips completed"
 
           // Write to log file
-          val logWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/logs/hourly-trip-counts.txt", true))
+          val logWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/TAXI-SECOND/taxi-stream/logs/hourly-trip-counts.txt", true))
           logWriter.println(logMessage)
           logWriter.close()
 
@@ -142,7 +142,7 @@ object Consumer{
         batchDf.show(truncate = false)
 
         // Write summary to main log file
-        val summaryWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/logs/trip-num-check.txt", true))
+        val summaryWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/TAXI-SECOND/taxi-stream/logs/trip-num-check.txt", true))
         summaryWriter.println(s"[${LocalDateTime.now()}] CONSUMER: Batch $batchId - processed hourly counts, total trips processed: $totalTripsProcessed")
         summaryWriter.close()
       }
