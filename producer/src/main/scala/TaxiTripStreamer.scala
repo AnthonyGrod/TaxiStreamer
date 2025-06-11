@@ -1,5 +1,3 @@
-package producer
-
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.functions._
 

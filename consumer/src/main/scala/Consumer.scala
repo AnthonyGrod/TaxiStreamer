@@ -1,8 +1,8 @@
-package consumer
-
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types._
+
 import java.io.{FileWriter, PrintWriter}
 import java.time.LocalDateTime
 
@@ -48,7 +48,7 @@ object Consumer{
         col("data.PULocationID").as("start_location_id"),
         from_unixtime(col("data.time")).cast("timestamp").as("start_time")
       )
-      .withWatermark("start_time", "10 minutes")
+      .withWatermark("start_time", "2 seconds")
 
     // Read trip-end stream
     val endDf = spark
@@ -67,27 +67,27 @@ object Consumer{
         col("data.DOLocationID").as("end_location_id"),
         from_unixtime(col("data.time")).cast("timestamp").as("end_time")
       )
-      .withWatermark("end_time", "10 minutes")
+      .withWatermark("end_time", "2 seconds")
 
-    // Create joined table with trip_id, start_location_id, end_location_id, start_time
-    val joinedTrips = startDf.alias("start")
-      .join(
-        endDf.alias("end"),
-        expr("""
-          start.trip_id = end.trip_id AND
-          end.end_time >= start.start_time AND
-          end.end_time <= start.start_time + interval 4 hours
-        """)
-      )
-      .select(
-        col("start.trip_id"),
-        col("start.start_location_id"),
-        col("end.end_location_id"),
-        col("start.start_time")
-      )
+//    // Create joined table with trip_id, start_location_id, end_location_id, start_time
+//    val joinedTrips = startDf.alias("start")
+//      .join(
+//        endDf.alias("end"),
+//        expr("""
+//          start.trip_id = end.trip_id AND
+//          end.end_time >= start.start_time AND
+//          end.end_time <= start.start_time + interval 4 hours
+//        """)
+//      )
+//      .select(
+//        col("start.trip_id"),
+//        col("start.start_location_id"),
+//        col("end.end_location_id"),
+//        col("start.start_time")
+//      )
 
     // Count trips every hour based on start_time
-    val hourlyTripCounts = joinedTrips
+    val hourlyTripCounts = startDf
       .withColumn("hour_window", date_trunc("hour", col("start_time")))
       .groupBy(
         window(col("start_time"), "1 hour").as("time_window")
@@ -99,7 +99,6 @@ object Consumer{
       )
       .select(
         col("time_window.start").as("hour_start"),
-        col("time_window.end").as("hour_end"),
         col("trip_count"),
         col("first_trip_time"),
         col("last_trip_time")
@@ -110,6 +109,7 @@ object Consumer{
     // Write hourly counts to console and logs
     val hourlyCountQuery = hourlyTripCounts.writeStream
       .outputMode("append") // Use append mode for streaming joins
+      .trigger(Trigger.ProcessingTime("10 seconds"))
       .format("console")
       .option("truncate", "false")
       .foreachBatch { (batchDf: Dataset[Row], batchId: Long) =>
@@ -118,8 +118,12 @@ object Consumer{
 
         batchDf.collect().foreach { row =>
           val hourStart = row.getTimestamp(0)
-          val hourEnd = row.getTimestamp(1)
-          val tripCount = row.getLong(2)
+          val tripCount = row.getLong(1)
+          val firstTrip = row.getTimestamp(2)
+          val lastTrip = row.getTimestamp(3)
+          
+          // Calculate hour end (add 1 hour to start)
+          val hourEnd = new java.sql.Timestamp(hourStart.getTime + 3600000L)
 
           val logMessage = s"[${LocalDateTime.now()}] HOURLY_COUNT: Hour ${hourStart} to ${hourEnd} - ${tripCount} trips completed"
 
