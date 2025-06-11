@@ -27,7 +27,6 @@ object TaxiTripStreamer {
         $"PULocationID",
         $"DOLocationID"
       )
-      .repartition(spark.sparkContext.defaultParallelism * 2)
       .withColumn("trip_id", monotonically_increasing_id())
       .orderBy($"pickup_time")
 

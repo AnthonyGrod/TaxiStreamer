@@ -116,7 +116,10 @@ object Consumer{
 
         println(s"=== Batch $batchId: Hourly Trip Counts ===")
 
-        batchDf.collect().foreach { row =>
+        // Sort the batch by hour_start for consistent ordering
+        val sortedRows = batchDf.orderBy("hour_start").collect()
+        
+        sortedRows.foreach { row =>
           val hourStart = row.getTimestamp(0)
           val tripCount = row.getLong(1)
           val firstTrip = row.getTimestamp(2)
@@ -125,11 +128,12 @@ object Consumer{
           // Calculate hour end (add 1 hour to start)
           val hourEnd = new java.sql.Timestamp(hourStart.getTime + 3600000L)
 
-          val logMessage = s"[${LocalDateTime.now()}] HOURLY_COUNT: Hour ${hourStart} to ${hourEnd} - ${tripCount} trips completed"
+          val logMessage = s"[${LocalDateTime.now()}] HOURLY_COUNT: Hour ${hourStart} to ${hourEnd} - ${tripCount} trips started"
 
           // Write to log file
           val logWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/TAXI-SECOND/taxi-stream/logs/hourly-trip-counts.txt", true))
           logWriter.println(logMessage)
+          logWriter.flush()
           logWriter.close()
 
           // Also print to console
