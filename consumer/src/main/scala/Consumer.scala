@@ -48,7 +48,7 @@ object Consumer{
         col("data.PULocationID").as("start_location_id"),
         from_unixtime(col("data.time")).cast("timestamp").as("start_time")
       )
-      .withWatermark("start_time", "5 seconds")
+      .withWatermark("start_time", "1 seconds")
 
     // Read trip-end stream
     val endDf = spark
@@ -67,7 +67,7 @@ object Consumer{
         col("data.DOLocationID").as("end_location_id"),
         from_unixtime(col("data.time")).cast("timestamp").as("end_time")
       )
-      .withWatermark("end_time", "2 seconds")
+      .withWatermark("end_time", "1 seconds")
 
 //    // Create joined table with trip_id, start_location_id, end_location_id, start_time
 //    val joinedTrips = startDf.alias("start")
@@ -109,7 +109,7 @@ object Consumer{
     // Write hourly counts to console and logs
     val hourlyCountQuery = hourlyTripCounts.writeStream
       .outputMode("append") // Use append mode for streaming joins
-      .trigger(Trigger.ProcessingTime("10 seconds"))
+      .trigger(Trigger.ProcessingTime("2 seconds"))
       .format("console")
       .option("truncate", "false")
       .foreachBatch { (batchDf: Dataset[Row], batchId: Long) =>
