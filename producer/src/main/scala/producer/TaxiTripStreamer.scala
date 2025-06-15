@@ -1,11 +1,12 @@
-import org.apache.spark.sql.{Row, SparkSession}
+package producer
+
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
-import java.util.Properties
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import java.io.{FileWriter, PrintWriter}
 import java.time.LocalDateTime
-
+import java.util.Properties
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 object TaxiTripStreamer {

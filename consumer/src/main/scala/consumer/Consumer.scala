@@ -1,10 +1,13 @@
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
+package consumer
+
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 
 import java.io.{FileWriter, PrintWriter}
 import java.time.LocalDateTime
+import scala.util.Try
 
 object Consumer{
   def main(args: Array[String]): Unit = {
@@ -16,7 +19,22 @@ object Consumer{
       .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
       .getOrCreate()
 
-    import spark.implicits._
+    // Clear checkpoint directories to ensure fresh start
+    def deleteDirectory(path: String): Unit = {
+      Try {
+        import java.io.File
+        def deleteRecursively(file: File): Boolean = {
+          if (file.isDirectory) {
+            file.listFiles.forall(deleteRecursively)
+          }
+          file.delete()
+        }
+        deleteRecursively(new File(path))
+      }
+    }
+    
+    deleteDirectory("/tmp/spark-checkpoint")
+    println("Cleared checkpoint directories for fresh start")
 
     // Define schema for trip data based on producer JSON structure
     val tripStartSchema = StructType(Array(
