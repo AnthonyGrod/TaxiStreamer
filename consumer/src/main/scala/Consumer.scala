@@ -103,30 +103,11 @@ object Consumer{
         col("last_trip_time")
       )
 
-    // Write hourly counts to Kafka for downstream processing
-    val hourlyCountQuery = hourlyTripCounts
-      .select(
-        col("hour_start").cast("string").as("key"),
-        to_json(struct(
-          col("hour_start"),
-          col("trip_count"),
-          col("first_trip_time"),
-          col("last_trip_time")
-        )).as("value")
-      )
-      .writeStream
-      .outputMode("append")
-      .trigger(Trigger.ProcessingTime("1 second"))
-      .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:29092")
-      .option("topic", "hourly-counts")
-      .option("checkpointLocation", "/tmp/spark-checkpoint/hourly-counts-kafka")
-      .start()
-
     @volatile var totalTripsProcessed = 0L
 
-    // Write hourly counts to console and logs
-    val hourlyCountQuery2 = hourlyTripCounts.writeStream
+    // Combined hourly counts query - write to both logs and Kafka
+    val hourlyCountQuery = hourlyTripCounts
+      .writeStream
       .outputMode("append")
       .trigger(Trigger.ProcessingTime("1 second"))
       .foreachBatch { (batchDf: Dataset[Row], batchId: Long) =>
@@ -167,9 +148,26 @@ object Consumer{
           val summaryWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/TAXI-SECOND/taxi-stream/logs/trip-num-check.txt", true))
           summaryWriter.println(s"[${LocalDateTime.now()}] CONSUMER: Batch $batchId - processed hourly counts, total trips processed: $totalTripsProcessed")
           summaryWriter.close()
+
+          // Write to Kafka for downstream processing
+          batchDf
+            .select(
+              col("hour_start").cast("string").as("key"),
+              to_json(struct(
+                col("hour_start"),
+                col("trip_count"),
+                col("first_trip_time"),
+                col("last_trip_time")
+              )).as("value")
+            )
+            .write
+            .format("kafka")
+            .option("kafka.bootstrap.servers", "localhost:29092")
+            .option("topic", "hourly-counts")
+            .save()
         }
       }
-      .option("checkpointLocation", "/tmp/spark-checkpoint/hourly-counts-logs")
+      .option("checkpointLocation", "/tmp/spark-checkpoint/hourly-counts-combined")
       .start()
 
     // Read hourly counts from Kafka and calculate daily aggregates
@@ -178,7 +176,7 @@ object Consumer{
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:29092")
       .option("subscribe", "hourly-counts")
-      .option("startingOffsets", "earliest") // Changed from "latest" to process all data
+      .option("startingOffsets", "latest")
       .load()
       .select(
         from_json(col("value").cast("string"), hourlyCountSchema).as("hourly_data")
@@ -283,7 +281,7 @@ object Consumer{
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:29092")
       .option("subscribe", "daily-counts")
-      .option("startingOffsets", "earliest")
+      .option("startingOffsets", "latest")
       .load()
       .select(
         from_json(col("value").cast("string"), dailyCountSchema).as("daily_data")
@@ -342,7 +340,7 @@ object Consumer{
               if (count >= 2 && stdDev > 0) { // Need at least 2 data points
                 val zScore = math.abs(actualTrips - avg) / stdDev
 
-                if (zScore > 1.0) { // Anomaly threshold
+                if (zScore > 1.5) { // Anomaly threshold
                   val anomalyType = if (actualTrips > avg) "HIGH" else "LOW"
                   val percentDiff = ((actualTrips - avg) / avg * 100)
 
@@ -374,5 +372,6 @@ object Consumer{
 
     // Wait for all streams to terminate
     spark.streams.awaitAnyTermination()
+    spark.stop()
   }
 }
