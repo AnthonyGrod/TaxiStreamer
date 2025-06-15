@@ -38,6 +38,14 @@ object Consumer{
       StructField("last_trip_time", TimestampType, true)
     ))
 
+    val dailyCountSchema = StructType(Array(
+      StructField("day_start", TimestampType, true),
+      StructField("daily_trip_count", LongType, true),
+      StructField("hours_with_data", LongType, true),
+      StructField("first_trip_of_day", TimestampType, true),
+      StructField("last_trip_of_day", TimestampType, true)
+    ))
+
     // Read trip-start stream
     val startDf = spark
       .readStream
@@ -205,7 +213,7 @@ object Consumer{
 
     @volatile var totalDailyTripsProcessed = 0L
 
-    // Write daily counts to log file
+    // Write daily counts to both log file and Kafka
     val dailyCountQuery = dailyTripCounts
       .writeStream
       .outputMode("append")
@@ -246,9 +254,122 @@ object Consumer{
           val summaryWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/TAXI-SECOND/taxi-stream/logs/trip-num-check.txt", true))
           summaryWriter.println(s"[${LocalDateTime.now()}] CONSUMER: Batch $batchId - processed daily counts, total daily trips processed: $totalDailyTripsProcessed")
           summaryWriter.close()
+
+          // Write to Kafka for anomaly detection
+          batchDf
+            .select(
+              col("day_start").cast("string").as("key"),
+              to_json(struct(
+                col("day_start"),
+                col("daily_trip_count"),
+                col("hours_with_data"),
+                col("first_trip_of_day"),
+                col("last_trip_of_day")
+              )).as("value")
+            )
+            .write
+            .format("kafka")
+            .option("kafka.bootstrap.servers", "localhost:29092")
+            .option("topic", "daily-counts")
+            .save()
         }
       }
       .option("checkpointLocation", "/tmp/spark-checkpoint/daily-counts")
+      .start()
+
+    // Read daily counts for anomaly detection
+    val dailyCountsStream = spark
+      .readStream
+      .format("kafka")
+      .option("kafka.bootstrap.servers", "localhost:29092")
+      .option("subscribe", "daily-counts")
+      .option("startingOffsets", "earliest")
+      .load()
+      .select(
+        from_json(col("value").cast("string"), dailyCountSchema).as("daily_data")
+      )
+      .select(
+        col("daily_data.day_start"),
+        col("daily_data.daily_trip_count")
+      )
+      .withColumn("day_of_week", date_format(col("day_start"), "EEEE"))
+      .withColumn("day_of_week_num", dayofweek(col("day_start")))
+      .withWatermark("day_start", "30 days")
+
+    // Store for maintaining statistics
+    @volatile var dayOfWeekStats = Map[String, (Double, Double, Int)]() // (avg, stddev, count)
+
+    // Detect anomalies using foreachBatch to maintain state
+    val anomalyQuery = dailyCountsStream
+      .writeStream
+      .outputMode("append")
+      .trigger(Trigger.ProcessingTime("10 seconds"))
+      .foreachBatch { (batchDf: Dataset[Row], batchId: Long) =>
+
+        println(s"=== Batch $batchId: Anomaly Detection ===")
+
+        if (!batchDf.isEmpty) {
+          val dailyData = batchDf.collect()
+
+          val logWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/TAXI-SECOND/taxi-stream/logs/traffic-anomalies.txt", true))
+
+          // First update statistics for each day of week
+          val updates = dailyData.groupBy(_.getString(2)) // group by day_of_week
+
+          updates.foreach { case (dayOfWeek, rows) =>
+            val currentStats = dayOfWeekStats.getOrElse(dayOfWeek, (0.0, 0.0, 0))
+            val tripCounts = rows.map(_.getLong(1).toDouble)
+
+            // Update running statistics
+            val newCount = currentStats._3 + tripCounts.length
+            val newAvg = (currentStats._1 * currentStats._3 + tripCounts.sum) / newCount
+
+            // Calculate new standard deviation
+            val allValues = (1 to currentStats._3).map(_ => currentStats._1) ++ tripCounts
+            val variance = allValues.map(x => math.pow(x - newAvg, 2)).sum / newCount
+            val newStdDev = math.sqrt(variance)
+
+            dayOfWeekStats = dayOfWeekStats + (dayOfWeek -> (newAvg, newStdDev, newCount))
+          }
+
+          // Now check for anomalies
+          dailyData.foreach { row =>
+            val dayStart = row.getTimestamp(0)
+            val actualTrips = row.getLong(1)
+            val dayOfWeek = row.getString(2)
+
+            dayOfWeekStats.get(dayOfWeek).foreach { case (avg, stdDev, count) =>
+              if (count >= 2 && stdDev > 0) { // Need at least 2 data points
+                val zScore = math.abs(actualTrips - avg) / stdDev
+
+                if (zScore > 1.0) { // Anomaly threshold
+                  val anomalyType = if (actualTrips > avg) "HIGH" else "LOW"
+                  val percentDiff = ((actualTrips - avg) / avg * 100)
+
+                  val logMessage = s"""
+                                      |ANOMALY DETECTED - ${anomalyType} TRAFFIC:
+                                      |  Date: ${dayStart} (${dayOfWeek})
+                                      |  Actual trips: ${actualTrips}
+                                      |  Expected trips: ${avg.formatted("%.0f")} (±${stdDev.formatted("%.0f")})
+                                      |  Deviation: ${zScore.formatted("%.2f")} standard deviations (${percentDiff.formatted("%.1f")}% difference)
+                                      |  Based on ${count} ${dayOfWeek}s in history
+                                      |""".stripMargin
+
+                  logWriter.println(logMessage)
+                  println(logMessage)
+                }
+              }
+            }
+          }
+
+          logWriter.flush()
+          logWriter.close()
+
+          // Show current batch data
+          batchDf.show(truncate = false)
+        }
+      }
+      .option("checkpointLocation", "/tmp/spark-checkpoint/anomaly-detection")
       .start()
 
     // Wait for all streams to terminate
