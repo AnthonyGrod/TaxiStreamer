@@ -1,0 +1,70 @@
+---
+# Upgrade Java from 11 to 17 for Spark 4.0.0 compatibility
+- name: Upgrade Java to version 17
+  hosts: producer:consumer
+  become: yes
+  tasks:
+    - name: Check current Java version
+      shell: java -version 2>&1 | head -1
+      register: current_java
+      changed_when: false
+
+    - name: Display current Java version
+      debug:
+        msg: "Current Java: {{ current_java.stdout }}"
+
+    - name: Install Java 17
+      apt:
+        name: openjdk-17-jdk
+        state: present
+        update_cache: yes
+
+    - name: Remove Java 11 (optional)
+      apt:
+        name: openjdk-11-jdk
+        state: absent
+      ignore_errors: yes
+
+    - name: Set Java 17 as default
+      alternatives:
+        name: java
+        path: /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+        priority: 1
+      ignore_errors: yes
+
+    - name: Set javac 17 as default
+      alternatives:
+        name: javac
+        path: /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
+        priority: 1
+      ignore_errors: yes
+
+    - name: Verify new Java version
+      shell: java -version 2>&1 | head -1
+      register: new_java
+      changed_when: false
+
+    - name: Display new Java version
+      debug:
+        msg: "New Java: {{ new_java.stdout }}"
+
+    - name: Set JAVA_HOME environment variable
+      lineinfile:
+        path: /home/{{ ansible_user }}/.bashrc
+        line: 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64'
+        create: yes
+      become: no
+
+    - name: Clean SBT cache (to avoid version conflicts)
+      file:
+        path: /home/{{ ansible_user }}/.sbt
+        state: absent
+      become: no
+      ignore_errors: yes
+
+    - name: Clean Ivy cache
+      file:
+        path: /home/{{ ansible_user }}/.ivy2
+        state: absent
+      become: no
+      ignore_errors: yes

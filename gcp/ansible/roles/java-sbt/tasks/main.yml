@@ -1,0 +1,47 @@
+---
+- name: Install Java
+  apt:
+    name: "{{ java_version }}"
+    state: present
+  become: yes
+
+- name: Add SBT repository key
+  apt_key:
+    keyserver: keyserver.ubuntu.com
+    id: 2EE0EA64E40A89B84B2DF73499E82A75642AC823
+  become: yes
+
+- name: Add SBT repository
+  apt_repository:
+    repo: "deb https://repo.scala-sbt.org/scalasbt/debian all main"
+    state: present
+  become: yes
+
+- name: Add SBT legacy repository
+  apt_repository:
+    repo: "deb https://repo.scala-sbt.org/scalasbt/debian /"
+    state: present
+  become: yes
+
+- name: Install SBT
+  apt:
+    name: sbt
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Verify Java installation
+  command: java -version
+  register: java_version_output
+  changed_when: false
+
+- name: Verify SBT installation
+  shell: sbt --version || which sbt
+  register: sbt_version_output
+  changed_when: false
+  failed_when: false
+
+- name: Display SBT version
+  debug:
+    msg: "SBT is installed: {{ sbt_version_output.stdout }}"
+  when: sbt_version_output.rc == 0

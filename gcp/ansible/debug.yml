@@ -1,0 +1,71 @@
+---
+# Debug playbook to check system status
+- name: Debug all VMs
+  hosts: all
+  gather_facts: yes
+  tasks:
+    - name: Check connectivity
+      ping:
+
+    - name: Check disk space
+      shell: df -h
+      register: disk_space
+
+    - name: Check memory
+      shell: free -h  
+      register: memory
+
+    - name: Check Docker status
+      shell: docker --version && docker ps
+      register: docker_status
+      ignore_errors: yes
+
+    - name: Check if directories exist
+      stat:
+        path: "{{ item }}"
+      register: dir_check
+      loop:
+        - "{{ project_dir }}"
+        - "{{ logs_dir }}"
+        - "{{ data_dir }}"
+
+    - name: Display system info
+      debug:
+        msg:
+          - "=== VM: {{ inventory_hostname }} ==="
+          - "Disk Space:"
+          - "{{ disk_space.stdout_lines }}"
+          - "Memory:"
+          - "{{ memory.stdout_lines }}"
+          - "Docker:"
+          - "{{ docker_status.stdout_lines if docker_status.rc == 0 else 'Docker not installed' }}"
+
+- name: Check Zookeeper specific
+  hosts: zookeeper
+  tasks:
+    - name: Check Zookeeper port
+      wait_for:
+        port: "{{ zookeeper_port }}"
+        host: "{{ ansible_default_ipv4.address }}"
+        timeout: 5
+      ignore_errors: yes
+      register: zk_port_check
+
+    - name: Display Zookeeper status
+      debug:
+        msg: "Zookeeper port {{ zookeeper_port }}: {{ 'Open' if zk_port_check.failed == false else 'Closed' }}"
+
+- name: Check Kafka specific  
+  hosts: kafka
+  tasks:
+    - name: Check Kafka port
+      wait_for:
+        port: "{{ kafka_port }}"
+        host: "{{ ansible_default_ipv4.address }}"
+        timeout: 5
+      ignore_errors: yes
+      register: kafka_port_check
+
+    - name: Display Kafka status
+      debug:
+        msg: "Kafka port {{ kafka_port }}: {{ 'Open' if kafka_port_check.failed == false else 'Closed' }}"

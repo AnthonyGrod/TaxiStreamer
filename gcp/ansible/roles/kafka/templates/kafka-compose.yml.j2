@@ -1,0 +1,20 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    ports:
+      - "{{ kafka_port }}:{{ kafka_port }}"
+      - "{{ kafka_external_port }}:{{ kafka_external_port }}"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: {{ hostvars[groups['zookeeper'][0]]['internal_ip'] }}:{{ zookeeper_port }}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://{{ internal_ip }}:{{ kafka_port }},PLAINTEXT_HOST://{{ ansible_host }}:{{ kafka_external_port }}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG4J_ROOT_LOGLEVEL: WARN
+      KAFKA_LOG4J_LOGGERS: "kafka=WARN,kafka.controller=WARN,kafka.log.LogCleaner=WARN,state.change.logger=WARN,kafka.producer.async.DefaultEventHandler=WARN"
+    restart: unless-stopped

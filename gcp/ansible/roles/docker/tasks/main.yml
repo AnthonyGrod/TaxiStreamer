@@ -1,0 +1,74 @@
+---
+- name: Install Docker dependencies
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+  become: yes
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  become: yes
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+  become: yes
+
+- name: Install Docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Add user to docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  become: yes
+
+- name: Start and enable Docker service
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Install Python pip
+  apt:
+    name: python3-pip
+    state: present
+  become: yes
+
+- name: Remove old Docker Compose if exists
+  file:
+    path: /usr/local/bin/docker-compose
+    state: absent
+  become: yes
+
+- name: Install Docker Compose via pip (compatible version)
+  pip:
+    name: docker-compose==1.29.2
+    state: present
+  become: yes
+
+- name: Install Docker SDK for Python
+  pip:
+    name: docker
+    state: present
+  become: yes
+
+- name: Reset ssh connection to allow user changes to affect ansible user
+  meta: reset_connection

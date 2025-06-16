@@ -1,0 +1,47 @@
+---
+# Playbook to start/stop applications
+- name: Start Producer
+  hosts: producer
+  tasks:
+    - name: Start TaxiTripStreamer
+      shell: |
+        export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+        cd {{ project_dir }}
+        nohup sbt "runMain producer.TaxiTripStreamer" > {{ logs_dir }}/producer.log 2>&1 &
+        echo $! > {{ project_dir }}/producer.pid
+      args:
+        creates: "{{ project_dir }}/producer.pid"
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      when: action == "start"
+
+    - name: Stop TaxiTripStreamer
+      shell: |
+        if [ -f {{ project_dir }}/producer.pid ]; then
+          kill $(cat {{ project_dir }}/producer.pid)
+          rm {{ project_dir }}/producer.pid
+        fi
+      when: action == "stop"
+
+- name: Start Consumer
+  hosts: consumer
+  tasks:
+    - name: Start Consumer
+      shell: |
+        export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+        cd {{ project_dir }}
+        nohup sbt "runMain consumer.Consumer" > {{ logs_dir }}/consumer.log 2>&1 &
+        echo $! > {{ project_dir }}/consumer.pid
+      args:
+        creates: "{{ project_dir }}/consumer.pid"
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      when: action == "start"
+
+    - name: Stop Consumer
+      shell: |
+        if [ -f {{ project_dir }}/consumer.pid ]; then
+          kill $(cat {{ project_dir }}/consumer.pid)
+          rm {{ project_dir }}/consumer.pid
+        fi
+      when: action == "stop"
