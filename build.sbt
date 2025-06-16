@@ -7,13 +7,13 @@ val kafkaVersion = "4.0.0"
 
 val commonDependencies = Seq(
   "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
-  "org.apache.spark" %% "spark-core" % sparkVersion,
-  "org.apache.spark" %% "spark-sql" % sparkVersion
+  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided"
 )
 
 val kafkaDependencies = Seq(
-  "org.apache.spark" %% "spark-sql-kafka-0-10" % sparkVersion,
-  "org.apache.spark" %% "spark-streaming-kafka-0-10" % sparkVersion)
+  "org.apache.spark" %% "spark-sql-kafka-0-10" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-streaming-kafka-0-10" % sparkVersion % "provided")
 
 // Producer module
 lazy val producer = (project in file("producer"))
