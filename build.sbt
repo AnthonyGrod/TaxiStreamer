@@ -28,6 +28,7 @@ lazy val producer = (project in file("producer"))
       case _ => MergeStrategy.first
     }
   )
+  .dependsOn(consumer)
 
 // Consumer module  
 lazy val consumer = (project in file("consumer"))

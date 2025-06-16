@@ -9,6 +9,8 @@ import java.time.LocalDateTime
 import java.util.Properties
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 
+import consumer.Consumer
+
 object TaxiTripStreamer {
   def main(args: Array[String]): Unit = {
 
@@ -21,7 +23,7 @@ object TaxiTripStreamer {
 
     // Read Parquet
     val df = spark.read
-      .parquet("/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/data/yellow_tripdata_2025-02.parquet")
+      .parquet("data/yellow_tripdata_2025-02.parquet")
       .select(
         unix_timestamp($"tpep_pickup_datetime").cast("long").alias("pickup_time"),
         unix_timestamp($"tpep_dropoff_datetime").cast("long").alias("dropoff_time"),
@@ -38,7 +40,7 @@ object TaxiTripStreamer {
     val totalTrips = df.count()
     println(s"Total trips in parquet file: $totalTrips")
 
-    val logWriter = new PrintWriter(new FileWriter("/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/logs/trip-num-check.txt", true))
+    val logWriter = new PrintWriter(new FileWriter("logs/trip-num-check.txt", true))
     logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: Total trips in parquet file: $totalTrips")
     logWriter.flush()
 
@@ -73,6 +75,13 @@ object TaxiTripStreamer {
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     val producer = new KafkaProducer[String, String](props)
 
+    val consumerThread = new Thread(new Runnable() {
+      override def run(): Unit = {
+        Consumer.run()
+      }
+    })
+    consumerThread.start()
+
     var tripsSent = 0
     // TODO: find a faster way to produce trips (some Spark API for parallelism?). Also: send trip end separately based on actual time.
     recordIter.foreach { case (pickup, dropoff, pu, doo, tripId) =>
@@ -105,6 +114,9 @@ object TaxiTripStreamer {
     println(s"Total trips sent: $tripsSent")
 
     producer.close()
+
+    consumerThread.join()
+
     spark.stop()
   }
 }
