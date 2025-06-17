@@ -58,9 +58,9 @@
     state: absent
   become: yes
 
-- name: Install Docker Compose via pip (compatible version)
-  pip:
-    name: docker-compose==1.29.2
+- name: Install Docker Compose
+  apt:
+    name: docker-compose-plugin
     state: present
   become: yes
 

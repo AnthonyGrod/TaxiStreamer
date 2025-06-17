@@ -1,47 +1,29 @@
 ---
-- name: Install Java
+- name: Install OpenJDK 17
   apt:
-    name: "{{ java_version }}"
+    name: openjdk-17-jdk
     state: present
   become: yes
 
-- name: Add SBT repository key
-  apt_key:
-    keyserver: keyserver.ubuntu.com
-    id: 2EE0EA64E40A89B84B2DF73499E82A75642AC823
+- name: Set JAVA_HOME environment variable
+  lineinfile:
+    path: /etc/environment
+    line: 'JAVA_HOME={{ java_home }}'
+    create: yes
   become: yes
 
-- name: Add SBT repository
-  apt_repository:
-    repo: "deb https://repo.scala-sbt.org/scalasbt/debian all main"
-    state: present
-  become: yes
-
-- name: Add SBT legacy repository
-  apt_repository:
-    repo: "deb https://repo.scala-sbt.org/scalasbt/debian /"
-    state: present
+- name: Add Java to PATH
+  lineinfile:
+    path: /etc/environment
+    line: 'PATH="$PATH:{{ java_home }}/bin"'
+    create: yes
   become: yes
 
 - name: Install SBT
-  apt:
-    name: sbt
-    state: present
-    update_cache: yes
+  shell: |
+    echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | tee /etc/apt/sources.list.d/sbt.list
+    echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | tee /etc/apt/sources.list.d/sbt_old.list
+    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | apt-key add
+    apt-get update
+    apt-get install -y sbt
   become: yes
-
-- name: Verify Java installation
-  command: java -version
-  register: java_version_output
-  changed_when: false
-
-- name: Verify SBT installation
-  shell: sbt --version || which sbt
-  register: sbt_version_output
-  changed_when: false
-  failed_when: false
-
-- name: Display SBT version
-  debug:
-    msg: "SBT is installed: {{ sbt_version_output.stdout }}"
-  when: sbt_version_output.rc == 0

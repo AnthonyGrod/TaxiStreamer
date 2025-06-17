@@ -1,0 +1,17 @@
+---
+- name: Run Spark Producer Application
+  hosts: spark-cluster
+  become: no
+  tasks:
+    - name: Fix ownership of taxi-stream directory
+      file:
+        path: /opt/taxi-stream
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        recurse: yes
+      become: yes
+      
+    - name: Execute producer application
+      shell: ./run-producer.sh
+      args:
+        chdir: /opt/taxi-stream

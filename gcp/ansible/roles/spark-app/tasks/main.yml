@@ -1,117 +1,24 @@
 ---
-- name: Copy build.sbt file
-  copy:
-    src: "{{ playbook_dir }}/../../build.sbt"
-    dest: "{{ project_dir }}/build.sbt"
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: '0644'
-
-- name: Synchronize src directory
-  synchronize:
-    src: "{{ playbook_dir }}/../../src/"
-    dest: "{{ project_dir }}/src/"
-    delete: yes
-    recursive: yes
-
-- name: Synchronize project directory  
-  synchronize:
-    src: "{{ playbook_dir }}/../../project/"
-    dest: "{{ project_dir }}/project/"
-    delete: yes
-    recursive: yes
-
-- name: Fix ownership of copied files
+- name: Create application directory
   file:
-    path: "{{ project_dir }}"
+    path: /opt/taxi-stream
+    state: directory
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
-    recurse: yes
+    mode: '0755'
+  become: yes
 
-- name: Verify project files copied
-  find:
-    paths: "{{ project_dir }}"
-    recurse: yes
-  register: project_files
+- name: Clone TaxiStreamer repository from GitHub
+  git:
+    repo: https://github.com/AnthonyGrod/TaxiStreamer.git
+    dest: /opt/taxi-stream
+    force: yes
+  become: yes
 
-- name: Display copied files
-  debug:
-    msg: "Project files: {{ project_files.files | map(attribute='path') | list }}"
-
-- name: Check if producer file exists
-  stat:
-    path: "{{ project_dir }}/src/main/scala/producer/TaxiTripStreamer.scala"
-  register: producer_file_check
-
-- name: Check if consumer file exists
-  stat:
-    path: "{{ project_dir }}/src/main/scala/consumer/Consumer.scala"
-  register: consumer_file_check
-
-- name: Display file existence
-  debug:
-    msg:
-      - "Producer file exists: {{ producer_file_check.stat.exists }}"
-      - "Consumer file exists: {{ consumer_file_check.stat.exists }}"
-
-- name: Update Kafka broker address in producer
-  replace:
-    path: "{{ project_dir }}/src/main/scala/producer/TaxiTripStreamer.scala"
-    regexp: 'localhost:29092'
-    replace: "{{ hostvars[groups['kafka'][0]]['internal_ip'] }}:{{ kafka_port }}"
-  when: "'producer' in group_names and producer_file_check.stat.exists"
-
-- name: Update Kafka broker address in consumer
-  replace:
-    path: "{{ project_dir }}/src/main/scala/consumer/Consumer.scala"
-    regexp: 'localhost:29092'
-    replace: "{{ hostvars[groups['kafka'][0]]['internal_ip'] }}:{{ kafka_port }}"
-  when: "'consumer' in group_names and consumer_file_check.stat.exists"
-
-- name: Update parquet file path in producer
-  replace:
-    path: "{{ project_dir }}/src/main/scala/producer/TaxiTripStreamer.scala"
-    regexp: '/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/data/'
-    replace: "{{ data_dir }}/"
-  when: "'producer' in group_names and producer_file_check.stat.exists"
-
-- name: Update log file paths in producer
-  replace:
-    path: "{{ project_dir }}/src/main/scala/producer/TaxiTripStreamer.scala"
-    regexp: '/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/logs/'
-    replace: "{{ logs_dir }}/"
-  when: "'producer' in group_names and producer_file_check.stat.exists"
-
-- name: Update log file paths in consumer
-  replace:
-    path: "{{ project_dir }}/src/main/scala/consumer/Consumer.scala"
-    regexp: '/home/agrodowski/Desktop/MIM/PDD/KAFKA/taxi-stream/logs/'
-    replace: "{{ logs_dir }}/"
-  when: "'consumer' in group_names and consumer_file_check.stat.exists"
-
-- name: Check if build.sbt exists
-  stat:
-    path: "{{ project_dir }}/build.sbt"
-  register: build_sbt_check
-
-- name: Display build.sbt status
-  debug:
-    msg: "build.sbt exists: {{ build_sbt_check.stat.exists }}"
-
-- name: Compile Scala project
-  shell: sbt compile
-  args:
-    chdir: "{{ project_dir }}"
-  register: sbt_compile
-  changed_when: "'[success]' in sbt_compile.stdout"
-  failed_when: sbt_compile.rc != 0
-  when: build_sbt_check.stat.exists
-
-- name: Display compilation result
-  debug:
-    msg: 
-      - "SBT compile stdout:"
-      - "{{ sbt_compile.stdout_lines }}"
-      - "SBT compile stderr:"
-      - "{{ sbt_compile.stderr_lines }}"
-  when: build_sbt_check.stat.exists
+- name: Create producer run script
+  template:
+    src: run-producer.sh.j2
+    dest: /opt/taxi-stream/run-producer.sh
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

@@ -1,16 +1,27 @@
 # Global variables for all hosts
+spark_version: "3.4.0"
+scala_version: "2.13"
+hadoop_version: "3"
+kafka_version: "2.8.2"
+java_version: "17"
+
+# Kafka configuration
+kafka_home: "/opt/kafka"
+
+kafka_port: 9092
+kafka_external_port: 29092
+
 project_dir: "/home/{{ ansible_user }}/taxi-stream"
 logs_dir: "{{ project_dir }}/logs"
 data_dir: "{{ project_dir }}/data"
 
-# Kafka configuration
-zookeeper_port: 2181
-kafka_port: 9092
-kafka_external_port: 29092
+# Java configuration
+java_home: "/usr/lib/jvm/java-17-openjdk-amd64"
 
-# Java and SBT versions - Spark 4.0.0 requires Java 17+
-java_version: "openjdk-17-jdk"
-sbt_version: "1.8.2"
+# Network configuration - will be populated by terraform output
+kafka_ip: "34.118.125.118"
+kafka_ip_internal: "10.186.0.39"
 
-# Docker Compose version
-docker_compose_version: "1.29.2"
+spark_ip: "34.118.98.90"
+spark_ip_internal: "10.186.0.42"
+
