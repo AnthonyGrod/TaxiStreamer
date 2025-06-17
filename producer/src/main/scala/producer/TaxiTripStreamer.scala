@@ -66,7 +66,7 @@ object TaxiTripStreamer {
     logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: First trip in ms: $baseDataTime")
     logWriter.flush()
 
-    val speed = 60.0  // 2x speed
+    val speed = 3600.0
 
     // Kafka setup
     val props = new Properties()
@@ -83,7 +83,6 @@ object TaxiTripStreamer {
     consumerThread.start()
 
     var tripsSent = 0
-    // TODO: find a faster way to produce trips (some Spark API for parallelism?). Also: send trip end separately based on actual time.
     recordIter.foreach { case (pickup, dropoff, pu, doo, tripId) =>
       val now = System.currentTimeMillis()
       val simWallTime = baseDataTime + ((now - baseRealTime) * speed).toLong

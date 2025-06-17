@@ -19,7 +19,6 @@ object Consumer{
       .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
       .getOrCreate()
 
-    // Clear checkpoint directories to ensure fresh start
     def deleteDirectory(path: String): Unit = {
       Try {
         import java.io.File
@@ -36,7 +35,6 @@ object Consumer{
     deleteDirectory("/tmp/spark-checkpoint")
     println("Cleared checkpoint directories for fresh start")
 
-    // Define schema for trip data based on producer JSON structure
     val tripStartSchema = StructType(Array(
       StructField("trip_id", LongType, true),
       StructField("time", LongType, true),
@@ -64,7 +62,6 @@ object Consumer{
       StructField("last_trip_of_day", TimestampType, true)
     ))
 
-    // Read trip-start stream
     val startDf = spark
       .readStream
       .format("kafka")
@@ -83,7 +80,6 @@ object Consumer{
       )
       .withWatermark("start_time", "10 seconds")
 
-    // Read trip-end stream
     val endDf = spark
       .readStream
       .format("kafka")
@@ -103,7 +99,6 @@ object Consumer{
       .withWatermark("end_time", "10 seconds")
 
 
-    // Count trips every hour based on start_time
     val hourlyTripCounts = startDf
       .withColumn("hour_window", date_trunc("hour", col("start_time")))
       .groupBy(
@@ -123,7 +118,6 @@ object Consumer{
 
     @volatile var totalTripsProcessed = 0L
 
-    // Combined hourly counts query - write to both logs and Kafka
     val hourlyCountQuery = hourlyTripCounts
       .writeStream
       .outputMode("append")
@@ -139,30 +133,23 @@ object Consumer{
           sortedRows.foreach { row =>
             val hourStart = row.getTimestamp(0)
             val tripCount = row.getLong(1)
-            val firstTrip = row.getTimestamp(2)
-            val lastTrip = row.getTimestamp(3)
 
-            // Calculate hour end (add 1 hour to start)
             val hourEnd = new java.sql.Timestamp(hourStart.getTime + 3600000L)
 
             val logMessage = s"[${LocalDateTime.now()}] HOURLY_COUNT: Hour ${hourStart} to ${hourEnd} - ${tripCount} trips started"
 
-            // Write to log file
             val logWriter = new PrintWriter(new FileWriter("logs/hourly-trip-counts.txt", true))
             logWriter.println(logMessage)
             logWriter.flush()
             logWriter.close()
 
-            // Also print to console
             println(logMessage)
 
             totalTripsProcessed += tripCount
           }
 
-          // Show the detailed batch data
           batchDf.show(truncate = false)
 
-          // Write summary to main log file
           val summaryWriter = new PrintWriter(new FileWriter("logs/trip-num-check.txt", true))
           summaryWriter.println(s"[${LocalDateTime.now()}] CONSUMER: Batch $batchId - processed hourly counts, total trips processed: $totalTripsProcessed")
           summaryWriter.close()
@@ -188,7 +175,6 @@ object Consumer{
       .option("checkpointLocation", "/tmp/spark-checkpoint/hourly-counts-combined")
       .start()
 
-    // Read hourly counts from Kafka and calculate daily aggregates
     val hourlyCountsStream = spark
       .readStream
       .format("kafka")
@@ -207,7 +193,6 @@ object Consumer{
       )
       .withWatermark("hour_start", "1 hour")
 
-    // Calculate daily trip counts
     val dailyTripCounts = hourlyCountsStream
       .withColumn("day", date_trunc("day", col("hour_start")))
       .groupBy(
@@ -229,7 +214,6 @@ object Consumer{
 
     @volatile var totalDailyTripsProcessed = 0L
 
-    // Write daily counts to both log file and Kafka
     val dailyCountQuery = dailyTripCounts
       .writeStream
       .outputMode("append")
@@ -251,22 +235,18 @@ object Consumer{
 
             val logMessage = s"[${LocalDateTime.now()}] DAILY_COUNT: Day ${dayStart} to ${dayEnd} - ${dailyTripCount} trips started (${hoursWithData} hours with data)"
 
-            // Write to log file
             val logWriter = new PrintWriter(new FileWriter("logs/daily-trip-counts.txt", true))
             logWriter.println(logMessage)
             logWriter.flush()
             logWriter.close()
 
-            // Also print to console
             println(logMessage)
 
             totalDailyTripsProcessed += dailyTripCount
           }
 
-          // Show the detailed batch data
           batchDf.show(truncate = false)
 
-          // Write summary to main log file
           val summaryWriter = new PrintWriter(new FileWriter("logs/trip-num-check.txt", true))
           summaryWriter.println(s"[${LocalDateTime.now()}] CONSUMER: Batch $batchId - processed daily counts, total daily trips processed: $totalDailyTripsProcessed")
           summaryWriter.close()
@@ -293,7 +273,6 @@ object Consumer{
       .option("checkpointLocation", "/tmp/spark-checkpoint/daily-counts")
       .start()
 
-    // Read daily counts for anomaly detection
     val dailyCountsStream = spark
       .readStream
       .format("kafka")
@@ -381,14 +360,12 @@ object Consumer{
           logWriter.flush()
           logWriter.close()
 
-          // Show current batch data
           batchDf.show(truncate = false)
         }
       }
       .option("checkpointLocation", "/tmp/spark-checkpoint/anomaly-detection")
       .start()
 
-    // Wait for all streams to terminate
     anomalyQuery.awaitTermination()
     spark.stop()
   }
