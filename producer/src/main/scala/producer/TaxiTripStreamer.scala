@@ -21,8 +21,8 @@ object TaxiTripStreamer {
 
     import spark.implicits._
 
-    // Read Parquet
-    val df = spark.read
+    // Read Parquet and create trip events
+    val tripsDF = spark.read
       .parquet("data/yellow_tripdata_2025-02.parquet")
       .select(
         unix_timestamp($"tpep_pickup_datetime").cast("long").alias("pickup_time"),
@@ -31,26 +31,45 @@ object TaxiTripStreamer {
         $"DOLocationID"
       )
       .withColumn("trip_id", monotonically_increasing_id())
-      .orderBy($"pickup_time")
 
-    df.printSchema()
-    println(df.show(100))
+    // Create pickup events
+    val pickupEvents = tripsDF
+      .select(
+        $"trip_id",
+        $"pickup_time".alias("event_time"),
+        lit("pickup").alias("event_type"),
+        $"PULocationID".alias("location_id")
+      )
 
+    // Create dropoff events
+    val dropoffEvents = tripsDF
+      .select(
+        $"trip_id",
+        $"dropoff_time".alias("event_time"),
+        lit("dropoff").alias("event_type"),
+        $"DOLocationID".alias("location_id")
+      )
 
-    val totalTrips = df.count()
-    println(s"Total trips in parquet file: $totalTrips")
+    // Union pickup and dropoff events, then sort by time
+    val allEventsDF = pickupEvents.union(dropoffEvents)
+      .orderBy($"event_time")
+
+    allEventsDF.printSchema()
+    println(allEventsDF.show(100))
+
+    val totalEvents = allEventsDF.count()
+    println(s"Total events in dataset: $totalEvents")
 
     val logWriter = new PrintWriter(new FileWriter("logs/trip-num-check.txt", true))
-    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: Total trips in parquet file: $totalTrips")
+    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: Total events in dataset: $totalEvents")
     logWriter.flush()
 
-    val recordIter = df.toLocalIterator().asScala.map { row =>
-      val pickup = row.getLong(0)
-      val dropoff = row.getLong(1)
-      val pu = row.getInt(2)
-      val doo = row.getInt(3)
-      val tripId = row.getLong(4)
-      (pickup, dropoff, pu, doo, tripId)
+    val recordIter = allEventsDF.toLocalIterator().asScala.map { row =>
+      val tripId = row.getLong(0)
+      val eventTime = row.getLong(1)
+      val eventType = row.getString(2)
+      val locationId = row.getInt(3)
+      (tripId, eventTime, eventType, locationId)
     }
 
     val firstRecord = recordIter.buffered.headOption
@@ -61,9 +80,9 @@ object TaxiTripStreamer {
     }
 
     val baseRealTime = System.currentTimeMillis()
-    val baseDataTime = firstRecord.get._1
+    val baseDataTime = firstRecord.get._2
 
-    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: First trip in ms: $baseDataTime")
+    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: First event in ms: $baseDataTime")
     logWriter.flush()
 
     val speed = 3600.0
@@ -75,6 +94,18 @@ object TaxiTripStreamer {
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     val producer = new KafkaProducer[String, String](props)
 
+    def sendEvent(producer: KafkaProducer[String, String], tripId: Long, eventTime: Long, eventType: String, locationId: Int): Unit = {
+      val (topic, locationField) = eventType match {
+        case "pickup" => ("trip-start", "PULocationID")
+        case "dropoff" => ("trip-end", "DOLocationID")
+      }
+      
+      val message = s"""{"trip_id":$tripId, "time":$eventTime, "$locationField":$locationId}"""
+      producer.send(new ProducerRecord[String, String](topic, null, message))
+      
+      println(s"Sent $eventType for trip $tripId at location $locationId")
+    }
+
     val consumerThread = new Thread(new Runnable() {
       override def run(): Unit = {
         Consumer.run()
@@ -82,35 +113,27 @@ object TaxiTripStreamer {
     })
     consumerThread.start()
 
-    var tripsSent = 0
-    recordIter.foreach { case (pickup, dropoff, pu, doo, tripId) =>
+    var eventsSent = 0
+    recordIter.foreach { case (tripId, eventTime, eventType, locationId) =>
       val now = System.currentTimeMillis()
       val simWallTime = baseDataTime + ((now - baseRealTime) * speed).toLong
 
-      if (pickup <= simWallTime) {
-        val pickupMsg = s"""{"trip_id":$tripId, "time":$pickup, "PULocationID":$pu}"""
-        val dropoffMsg = s"""{"trip_id":$tripId, "time":$dropoff, "DOLocationID":$doo}"""
-
-        producer.send(new ProducerRecord[String, String]("trip-start", null, pickupMsg))
-        producer.send(new ProducerRecord[String, String]("trip-end", null, dropoffMsg))
-        tripsSent += 1
-
-        println(s"Sent pickup & dropoff for trip $tripId: PU=$pu → DO=$doo")
+      if (eventTime <= simWallTime) {
+        // Send event immediately
+        sendEvent(producer, tripId, eventTime, eventType, locationId)
+        eventsSent += 1
       } else {
-        val waitMs = ((pickup - simWallTime) / speed).toLong
-        Thread.sleep(waitMs)
-        // Then send
-        val pickupMsg = s"""{"trip_id":$tripId, "time":$pickup, "PULocationID":$pu}"""
-        val dropoffMsg = s"""{"trip_id":$tripId, "time":$dropoff, "DOLocationID":$doo}"""
-        producer.send(new ProducerRecord[String, String]("trip-start", null, pickupMsg))
-        producer.send(new ProducerRecord[String, String]("trip-end", null, dropoffMsg))
-        tripsSent += 1
+        // Wait before sending
+        val waitMs = ((eventTime - simWallTime) / speed).toLong
+        if (waitMs > 0) Thread.sleep(waitMs)
+        sendEvent(producer, tripId, eventTime, eventType, locationId)
+        eventsSent += 1
       }
     }
 
-    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: Total trips sent: $tripsSent")
+    logWriter.println(s"[${LocalDateTime.now()}] PRODUCER: Total events sent: $eventsSent")
     logWriter.close()
-    println(s"Total trips sent: $tripsSent")
+    println(s"Total events sent: $eventsSent")
 
     producer.close()
 
