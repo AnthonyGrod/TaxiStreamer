@@ -1,0 +1,128 @@
+
+ANOMALY DETECTED - LOW TRAFFIC:
+  Date: 2025-02-19 01:00:00.0 (Wednesday)
+  Actual trips: 123679
+  Expected trips: 127486 (±2210)
+  Deviation: 1.72 standard deviations (-3.0% difference)
+  Based on 4 Wednesdays in history
+
+
+ANOMALY DETECTED - HIGH TRAFFIC:
+  Date: 2025-02-11 01:00:00.0 (Tuesday)
+  Actual trips: 125526
+  Expected trips: 119637 (±3696)
+  Deviation: 1.59 standard deviations (4.9% difference)
+  Based on 4 Tuesdays in history
+
+
+ANOMALY DETECTED - HIGH TRAFFIC:
+  Date: 2025-02-10 01:00:00.0 (Monday)
+  Actual trips: 108569
+  Expected trips: 99742 (±5291)
+  Deviation: 1.67 standard deviations (8.9% difference)
+  Based on 4 Mondays in history
+
+
+ANOMALY DETECTED - LOW TRAFFIC:
+  Date: 2025-02-22 01:00:00.0 (Saturday)
+  Actual trips: 141862
+  Expected trips: 146258 (±2579)
+  Deviation: 1.70 standard deviations (-3.0% difference)
+  Based on 4 Saturdays in history
+
+
+ANOMALY DETECTED - HIGH TRAFFIC:
+  Date: 2025-02-11 01:00:00.0 (Tuesday)
+  Actual trips: 125526
+  Expected trips: 119637 (±3696)
+  Deviation: 1.59 standard deviations (4.9% difference)
+  Based on 4 Tuesdays in history
+
+
+ANOMALY DETECTED - HIGH TRAFFIC:
+  Date: 2025-02-10 01:00:00.0 (Monday)
+  Actual trips: 108569
+  Expected trips: 99742 (±5291)
+  Deviation: 1.67 standard deviations (8.9% difference)
+  Based on 4 Mondays in history
+
+
+ANOMALY DETECTED - LOW TRAFFIC:
+  Date: 2025-02-19 01:00:00.0 (Wednesday)
+  Actual trips: 123679
+  Expected trips: 127486 (±2210)
+  Deviation: 1.72 standard deviations (-3.0% difference)
+  Based on 4 Wednesdays in history
+
+
+ANOMALY DETECTED - LOW TRAFFIC:
+  Date: 2025-02-22 01:00:00.0 (Saturday)
+  Actual trips: 141862
+  Expected trips: 146258 (±2579)
+  Deviation: 1.70 standard deviations (-3.0% difference)
+  Based on 4 Saturdays in history
+
+
+ANOMALY DETECTED - LOW TRAFFIC:
+  Date: 2025-02-19 01:00:00.0 (Wednesday)
+  Actual trips: 123679
+  Expected trips: 127486 (±2210)
+  Deviation: 1.72 standard deviations (-3.0% difference)
+  Based on 4 Wednesdays in history
+
+
+ANOMALY DETECTED - HIGH TRAFFIC:
+  Date: 2025-02-11 01:00:00.0 (Tuesday)
+  Actual trips: 125526
+  Expected trips: 119637 (±3696)
+  Deviation: 1.59 standard deviations (4.9% difference)
+  Based on 4 Tuesdays in history
+
+
+ANOMALY DETECTED - HIGH TRAFFIC:
+  Date: 2025-02-10 01:00:00.0 (Monday)
+  Actual trips: 108569
+  Expected trips: 99742 (±5291)
+  Deviation: 1.67 standard deviations (8.9% difference)
+  Based on 4 Mondays in history
+
+
+ANOMALY DETECTED - LOW TRAFFIC:
+  Date: 2025-02-19 01:00:00.0 (Wednesday)
+  Actual trips: 123679
+  Expected trips: 127486 (±2202)
+  Deviation: 1.73 standard deviations (-3.0% difference)
+  Based on 4 Wednesdays in history
+
+
+ANOMALY DETECTED - HIGH TRAFFIC:
+  Date: 2025-02-15 01:00:00.0 (Saturday)
+  Actual trips: 148473
+  Expected trips: 141151 (±4647)
+  Deviation: 1.58 standard deviations (5.2% difference)
+  Based on 4 Saturdays in history
+
+
+ANOMALY DETECTED - LOW TRAFFIC:
+  Date: 2025-02-19 01:00:00.0 (Wednesday)
+  Actual trips: 123679
+  Expected trips: 127486 (±2202)
+  Deviation: 1.73 standard deviations (-3.0% difference)
+  Based on 4 Wednesdays in history
+
+
+ANOMALY DETECTED - HIGH TRAFFIC:
+  Date: 2025-02-22 01:00:00.0 (Saturday)
+  Actual trips: 141862
+  Expected trips: 138969 (±1670)
+  Deviation: 1.73 standard deviations (2.1% difference)
+  Based on 4 Saturdays in history
+
+
+ANOMALY DETECTED - LOW TRAFFIC:
+  Date: 2025-02-23 01:00:00.0 (Sunday)
+  Actual trips: 108970
+  Expected trips: 117443 (±4892)
+  Deviation: 1.73 standard deviations (-7.2% difference)
+  Based on 4 Sundays in history
+
