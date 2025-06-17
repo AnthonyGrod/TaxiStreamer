@@ -14,9 +14,9 @@ object Consumer{
 
     val spark = SparkSession.builder()
       .appName("KafkaConsumerExample")
-//      .master("local[*]")
-//      .config("spark.sql.adaptive.enabled", "true")
-//      .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+      .master("local[*]")
+      .config("spark.sql.adaptive.enabled", "true")
+      .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
       .getOrCreate()
 
     // Clear checkpoint directories to ensure fresh start

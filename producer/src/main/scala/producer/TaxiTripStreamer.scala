@@ -16,7 +16,7 @@ object TaxiTripStreamer {
 
     val spark = SparkSession.builder
       .appName("TaxiTripStreamer")
-//      .master("local[*]")
+      .master("local[*]")
       .getOrCreate()
 
     import spark.implicits._
