@@ -389,7 +389,7 @@ object Consumer{
       .start()
 
     // Wait for all streams to terminate
-    spark.streams.awaitAnyTermination()
+    anomalyQuery.awaitTermination()
     spark.stop()
   }
 }
