@@ -68,7 +68,7 @@ object Consumer{
     val startDf = spark
       .readStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:29092")
+      .option("kafka.bootstrap.servers", "10.186.0.39:29092")
       .option("subscribe", "trip-start")
       .option("startingOffsets", "latest")
       .load()
@@ -87,7 +87,7 @@ object Consumer{
     val endDf = spark
       .readStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:29092")
+      .option("kafka.bootstrap.servers", "10.186.0.39:29092")
       .option("subscribe", "trip-end")
       .option("startingOffsets", "latest")
       .load()
@@ -180,7 +180,7 @@ object Consumer{
             )
             .write
             .format("kafka")
-            .option("kafka.bootstrap.servers", "localhost:29092")
+            .option("kafka.bootstrap.servers", "10.186.0.39:29092")
             .option("topic", "hourly-counts")
             .save()
         }
@@ -192,7 +192,7 @@ object Consumer{
     val hourlyCountsStream = spark
       .readStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:29092")
+      .option("kafka.bootstrap.servers", "10.186.0.39:29092")
       .option("subscribe", "hourly-counts")
       .option("startingOffsets", "latest")
       .load()
@@ -285,7 +285,7 @@ object Consumer{
             )
             .write
             .format("kafka")
-            .option("kafka.bootstrap.servers", "localhost:29092")
+            .option("kafka.bootstrap.servers", "10.186.0.39:29092")
             .option("topic", "daily-counts")
             .save()
         }
@@ -297,7 +297,7 @@ object Consumer{
     val dailyCountsStream = spark
       .readStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:29092")
+      .option("kafka.bootstrap.servers", "10.186.0.39:29092")
       .option("subscribe", "daily-counts")
       .option("startingOffsets", "latest")
       .load()

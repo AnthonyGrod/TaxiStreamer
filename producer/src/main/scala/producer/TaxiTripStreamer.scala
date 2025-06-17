@@ -70,7 +70,7 @@ object TaxiTripStreamer {
 
     // Kafka setup
     val props = new Properties()
-    props.put("bootstrap.servers", "localhost:29092")
+    props.put("bootstrap.servers", "10.186.0.39:29092")
     props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     val producer = new KafkaProducer[String, String](props)
